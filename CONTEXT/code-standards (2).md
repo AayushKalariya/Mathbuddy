@@ -73,7 +73,7 @@ The checker was implemented with Python 3.10.11 in .checker-venv. Its exact depe
 - Allow continuing after a flagged issue with a visible warning.
 - Test actual pen, palm, scrolling, and rotation behavior.
 
-The workspace now follows the user-provided dark interface reference: navy surfaces, purple side check buttons, and mint verified states. The question sits beside the step boxes on iPad/laptop widths and above them on narrow screens. System fonts, Lucide icons, and local KaTeX assets remain in use. Pencil writing with finger scrolling is the default; finger drawing remains optional. Keep handwriting readings editable and require review before a mathematical verdict. No component library is used.
+The workspace now follows the user-provided dark interface reference: a deep blue background (#162556), dark navy cards (#060c24), yellow side check buttons (#ffb900), and teal verified states (#00d5be). The palette was sampled from the user’s latest reference. The question sits beside the step boxes on iPad/laptop widths and above them on narrow screens. System fonts, Lucide icons, and local KaTeX assets remain in use. Pencil writing with finger scrolling is the default; finger drawing remains optional. Keep handwriting readings editable and require review before a mathematical verdict. No component library is used.
 
 ## API
 

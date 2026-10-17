@@ -154,3 +154,10 @@ Typed API names, contracts, grammar bounds, test runner, and checker dependencie
 - Automated verification: 102 backend tests and 22 frontend tests pass; strict TypeScript/Vite build succeeds; pip check reports no broken dependencies. Gemini HTTP traffic is mocked in automated tests, covering easy/hard requests, image reads, history, opt-in corrections, earlier-error guards, missing keys, quotas, malformed/blocked outputs, and credential redaction.
 - Browser verification on the isolated localhost:8001 draft: restored writing, calculus task entry/confirmation, typed checking, setup notice, and actionable missing-key failure with work preserved. Preview: artifacts/gemini-setup-needed.jpg.
 - Live Gemini accuracy/model access is NOT verified: GEMINI_API_KEY remained empty during this implementation. Real Google calls and actual iPad/Pencil checks require the user's configured key/device. The existing user server on port 8000 was left running; restart it to load backend changes.
+
+
+### October 17, 2026 — Blue, teal, and yellow theme
+
+- Applied the latest user-supplied palette: blue page #162556, dark navy cards #060c24, yellow actions #ffb900, and teal reviewed-correct states #00d5be. Replaced purple accents throughout controls, reading/review panels, links, and drawing tools; updated browser theme color and favicon.
+- Centralized the palette in CSS custom properties. Preserved all layout and checking/drawing behavior.
+- Verification: strict TypeScript/Vite production build passed. Browser checks confirmed sampled colors and no horizontal overflow at desktop and 768px iPad portrait widths; checked a typed step and an empty handwriting box. No new Gemini review requests were needed for this appearance change. Preview: artifacts/workspace-color-theme.jpg.
