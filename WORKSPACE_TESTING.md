@@ -56,7 +56,7 @@ The running setup was observed using CPU; no GPU performance is claimed.
 
 The workspace follows the supplied dark navy reference. The question is beside
 the drawing boxes on tablet/laptop widths and above them on phones. Each box has
-a purple check button on its right; verified steps turn mint green, and warnings
+a yellow check button on its right; reviewed-correct steps turn teal, and warnings
 appear immediately below the relevant box. Add next step creates another box.
 The editor collapses after Use this question; Edit reopens it.
 
