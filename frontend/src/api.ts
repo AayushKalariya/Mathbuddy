@@ -14,9 +14,12 @@ async function responseJson(response: Response): Promise<unknown> {
   }
   return data;
 }
-export async function recognize(image: Blob): Promise<string> {
+export async function recognize(
+  image: Blob,
+  purpose: "question" | "step" = "step",
+): Promise<string> {
   const data = await responseJson(
-    await fetch("/api/recognize", {
+    await fetch(`/api/recognize?purpose=${purpose}`, {
       method: "POST",
       headers: { "Content-Type": image.type },
       body: image,
@@ -58,6 +61,9 @@ export async function check(payload: object): Promise<CheckResult> {
     ) ||
     typeof data.correction_available !== "boolean" ||
     typeof data.verification_basis !== "string" ||
+    (data.reviewer !== undefined &&
+      !["local", "gemini"].includes(String(data.reviewer))) ||
+    (data.model !== undefined && typeof data.model !== "string") ||
     !Array.isArray(data.warnings) ||
     !data.warnings.every((w) => typeof w === "string") ||
     ["hint", "correction"].some(

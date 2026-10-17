@@ -38,6 +38,8 @@ class CheckResult(BaseModel):
     hint: str | None = None
     issue_type: str | None = None
     verification_basis: str
+    reviewer: Literal["local", "gemini"] = "local"
+    model: str | None = None
     correction_available: bool = False
     correction: str | None = None
     warnings: list[str] = Field(default_factory=list)

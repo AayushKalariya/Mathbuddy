@@ -1,3 +1,6 @@
+> Workspace update: the browser uses Gemini for every step. This guide describes
+> the preserved offline CLI and explicit `/api/local/` tools. See [GEMINI_SETUP.md](GEMINI_SETUP.md).
+
 # Testing Math Buddy's typed checker
 
 This guide covers typed-checker testing. The dedicated writing workspace is now
@@ -80,7 +83,7 @@ Start the server in PowerShell, leaving that window open:
 .\.checker-venv\Scripts\python.exe -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 ```
 
-Open http://127.0.0.1:8000/docs. Expand POST /api/check-step, select Try it out,
+Open http://127.0.0.1:8000/docs. Expand POST /api/local/check-step, select Try it out,
 and use this request:
 
 ```json

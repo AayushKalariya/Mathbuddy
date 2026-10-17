@@ -1,6 +1,28 @@
 # Math Buddy — Architecture Context
 
-Updated: October 15, 2026.
+## Current Gemini decision — October 17, 2026
+
+The user explicitly selected the Gemini API hackathon track and authorized Gemini
+for **all** submitted workspace steps, easy and hard, despite additional requests.
+This supersedes earlier local-only inference/API-deferral decisions below.
+The current default `/api/check-step` and `/api/recognize` use Gemini exclusively;
+there is no automatic local fallback. `.env` stores the server-only API key,
+`.env.example` is the blank template, and `GEMINI_SETUP.md` documents setup.
+The legacy exact checker/recognizer remain at explicit `/api/local/` endpoints
+and the CLI. The recognition environment and protected plan remain unchanged.
+
+Handwriting is read, reviewed/edited by the student, then checked as confirmed
+text against the question/task and full earlier history. Gemini returns bounded,
+validated structured output. UI results are labelled Reviewed by Gemini; positive
+AI assessments are not symbolic proofs. Hints come before corrections, earlier
+errors retain warnings, and uncertain work must not receive a green verdict.
+The key remains server-side; selected images/math are sent to Google. Browser
+drafts remain device/origin-specific. Internet and the key’s Google quota apply.
+No chat/voice sidebar, account system, paid subscription, or billing configuration
+was added. Existing keyless servers must restart to load the changed backend.
+
+
+Updated: October 17, 2026.
 Status: typed checker, first React writing workspace, local recognition adapter, and browser draft recovery implemented. Laptop session storage and installation remain planned.
 
 ## Implemented Checker Boundary
@@ -19,8 +41,8 @@ The checker accepts math text and restricted OCR-LaTeX. A separate image endpoin
 
 ## Implemented Workspace Boundary
 
-- frontend/src/App.tsx coordinates question upload/selection, reading confirmation, independent step cards, feedback, and continuation.
-- DrawingPad.tsx and ink.ts retain logical stroke coordinates, use Pointer Events/perfect-freehand, erase whole strokes, support undo, and rasterize clean images without the display grid.
+- frontend/src/App.tsx coordinates question upload/selection, reading confirmation, independent step cards, feedback, and continuation. The dark responsive workspace uses a sticky question sidebar at tablet/laptop widths, right-side check buttons, and inline feedback. Unconfirmed handwriting readings open for review; confirmed readings collapse to keep writing visible.
+- DrawingPad.tsx and ink.ts retain logical stroke coordinates, use Pointer Events/perfect-freehand, erase whole strokes, support undo, and rasterize dark ink on a clean white image for recognition independently of the dark display theme.
 - Writing surfaces disable native panning to prevent pen-stroke cancellation. With finger drawing off, one-finger drags explicitly scroll the page; additional contacts during an active stroke are ignored. Native inertia/actual Pencil palm behavior is not claimed and needs on-device testing.
 - state.ts binds each response to a request token, step revision, and a snapshot of the question/variable/all preceding steps. Edits invalidate that step and later feedback. Full ordered history accompanies checks.
 - api.ts validates response shapes and keeps transport/recognition errors separate from mathematical verdicts.

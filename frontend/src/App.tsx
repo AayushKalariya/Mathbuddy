@@ -1,10 +1,8 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import {
-  ArrowDown,
   ArrowRight,
   BookOpen,
   Check,
-  CheckCircle2,
   ChevronDown,
   CircleHelp,
   ImagePlus,
@@ -13,7 +11,7 @@ import {
   PenLine,
   Plus,
   ScanLine,
-  ShieldCheck,
+  Sparkles,
   TriangleAlert,
   WifiOff,
   X,
@@ -38,7 +36,7 @@ const titles = {
   issue: "Take another look",
   needs_clarification: "Needs clarification",
   incomplete: "Finish this line",
-  unsupported: "Outside current support",
+  unsupported: "Unable to verify this step",
 };
 
 function Feedback({
@@ -57,14 +55,11 @@ function Feedback({
           <div>
             <strong>
               {step.pending.kind === "reading"
-                ? "Reading your handwriting…"
-                : "Checking this step…"}
+                ? "Gemini is reading your handwriting…"
+                : "Gemini is reviewing this step…"}
             </strong>
             {step.pending.kind === "reading" && (
-              <span>
-                The first reading also loads the local model. You can keep
-                writing.
-              </span>
+              <span>Your writing stays here while Gemini reads this box.</span>
             )}
           </div>
         </div>
@@ -87,15 +82,28 @@ function Feedback({
         >
           <div className="feedback-heading">
             {result.status === "verified" ? (
-              <CheckCircle2 size={20} />
+              <Check size={15} />
             ) : result.status === "issue" ? (
               <TriangleAlert size={20} />
             ) : (
               <CircleHelp size={20} />
             )}
-            <strong>{titles[result.status]}</strong>
+            <strong>
+              {result.status === "verified"
+                ? result.reviewer === "gemini"
+                  ? "This step looks correct."
+                  : "Nice work — this step is correct."
+                : titles[result.status]}
+            </strong>
           </div>
-          <p>{result.message}</p>
+          {(result.status !== "verified" || result.reviewer === "gemini") && (
+            <p>{result.message}</p>
+          )}
+          {result.reviewer === "gemini" && (
+            <span className="reviewer-label">
+              <Sparkles size={12} /> Reviewed by Gemini
+            </span>
+          )}
           {result.hint && <p className="hint">{result.hint}</p>}
           {result.warnings.map((warning, i) => (
             <p key={i}>{warning}</p>
@@ -116,7 +124,11 @@ function Feedback({
           )}
           {result.correction && (
             <div className="correction">
-              <span>One valid correction</span>
+              <span>
+                {result.reviewer === "gemini"
+                  ? "Suggested next step"
+                  : "One valid correction"}
+              </span>
               <code>{result.correction}</code>
             </div>
           )}
@@ -124,6 +136,9 @@ function Feedback({
             <summary>
               How this was checked <ChevronDown size={13} />
             </summary>
+            {result.status === "verified" && result.reviewer !== "gemini" && (
+              <p>{result.message}</p>
+            )}
             <p>{result.verification_basis}</p>
           </details>
         </div>
@@ -145,6 +160,7 @@ export default function App() {
   const [questionError, setQuestionError] = useState("");
   const [help, setHelp] = useState(false);
   const [newWork, setNewWork] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const lastStep = useRef<HTMLDivElement>(null);
   const saveChain = useRef(Promise.resolve());
@@ -257,6 +273,7 @@ export default function App() {
     try {
       const math = await api.recognize(
         await imageBlob(snapshot.questionImage, crop),
+        "question",
       );
       if (
         questionToken.current === token &&
@@ -346,49 +363,32 @@ export default function App() {
         <div className="header-inner">
           <a className="brand" href="/" aria-label="Math Buddy workspace">
             <span className="brand-mark">
-              <BookOpen size={21} />
+              <BookOpen size={19} />
             </span>
             <span>
-              math<span className="brand-light">buddy</span>
-              <span className="brand-dot">.</span>
+              mathbuddy<span className="brand-dot">.</span>
             </span>
           </a>
-          <span className="header-divider" />
-          <span className="workspace-label">WORKSPACE</span>
+          <span className="workspace-label">YOUR THINKING SPACE</span>
           <div className="header-right">
             <span className={`connection ${online === false ? "offline" : ""}`}>
               <i />
               {online === false
                 ? "Laptop disconnected"
                 : online === true
-                  ? "Connected locally"
+                  ? "Laptop connected"
                   : "Connecting…"}
             </span>
             <button
-              className="icon-button"
-              aria-label="Workspace help"
-              onClick={() => setHelp(!help)}
+              className="button secondary new-question"
+              onClick={() => setNewWork(true)}
             >
-              <CircleHelp size={21} />
+              <Plus size={16} /> New question
             </button>
           </div>
         </div>
       </header>
       <main>
-        <div className="page-heading">
-          <div>
-            <div className="eyebrow">A LITTLE CLARITY, EVERY STEP</div>
-            <h1>Let’s work it out.</h1>
-            <p>Your question, your approach. A little help along the way.</p>
-          </div>
-          <button
-            className="button secondary new-question"
-            onClick={() => setNewWork(true)}
-          >
-            <Plus size={16} />
-            New question
-          </button>
-        </div>
         {newWork && (
           <div className="notice reset-prompt">
             <span>
@@ -400,6 +400,7 @@ export default function App() {
                 questionToken.current = "";
                 setQuestionBusy(false);
                 setQuestionError("");
+                setEditingQuestion(false);
                 dispatch({
                   type: "restore",
                   state: {
@@ -417,419 +418,479 @@ export default function App() {
             </button>
           </div>
         )}
-        {help && (
-          <section className="help-panel">
-            <button
-              className="icon-button"
-              aria-label="Close help"
-              onClick={() => setHelp(false)}
-            >
-              <X size={18} />
-            </button>
-            <h3>One line at a time</h3>
-            <p>
-              Upload a screenshot, select just the equation if needed, then read
-              and confirm the question. Write one equation in each step area.
-              Check step reads your handwriting; review that reading, then
-              confirm to check the math.
-            </p>
-            <p>
-              Arithmetic and one-variable linear equations are supported.
-              Different valid methods are welcome. A valid step need not be the
-              fastest approach. Calculus, inequalities, and nonlinear equations
-              aren’t supported yet.
-            </p>
-            <p>
-              Work stays local. This tab keeps one device draft; laptop session
-              saving and the AI chat sidebar are later features.
-            </p>
-          </section>
+        {online === true && !recognitionReady && (
+          <div className="notice" role="status">
+            <Sparkles size={18} />
+            <span>
+              Add your Gemini API key to the laptop’s .env file to enable image
+              reading and checking. Every step uses Gemini.
+            </span>
+          </div>
         )}
         {online === false && (
-          <div className="notice error">
+          <div className="notice error" role="status">
             <WifiOff size={18} />
             <span>
               Cannot reach the laptop. Your writing stays here. Keep the laptop
-              awake and retry checking when connected.
+              awake and retry when connected.
             </span>
           </div>
         )}
-        <section
-          className="card question-card"
-          aria-labelledby="question-heading"
-        >
-          <div className="section-heading">
-            <span className="section-icon">
-              <ImagePlus size={20} />
-            </span>
-            <div>
-              <h2 id="question-heading">Your question</h2>
-              <p>A screenshot is a good place to start. Typing works too.</p>
+        <div className="workspace-grid">
+          <aside className="question-column" aria-labelledby="question-heading">
+            <div className="question-kicker">
+              <span>
+                <Sparkles size={14} />
+              </span>{" "}
+              YOUR QUESTION
             </div>
-            <span className="chip">01 / QUESTION</span>
-          </div>
-          <input
-            ref={fileInput}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="visually-hidden"
-            aria-label="Upload question image"
-            onChange={(event) => void upload(event.target.files?.[0])}
-          />
-          {!state.questionImage ? (
-            <button
-              className="upload-zone"
-              onClick={() => fileInput.current?.click()}
-            >
-              <span className="upload-icon">
-                <ImagePlus size={25} />
-              </span>
-              <strong>Bring your question here</strong>
-              <span>Upload a screenshot or photo</span>
-              <span className="upload-formats">
-                PNG, JPG, or WebP · up to 8 MB
-              </span>
-            </button>
-          ) : (
-            <>
-              <QuestionImage
-                key={state.questionImage.slice(-80)}
-                source={state.questionImage}
-                busy={questionBusy}
-                onRead={(crop) => void readQuestion(crop)}
-              />
-              <button
-                className="text-button replace-image"
-                onClick={() => fileInput.current?.click()}
-              >
-                Replace image
-              </button>
-            </>
-          )}
-          {questionBusy && (
-            <p className="pending">
-              <LoaderCircle className="spin" size={16} />
-              Reading locally… first use loads the model.
-            </p>
-          )}
-          {questionError && (
-            <div className="notice error" role="alert">
-              {questionError}
-            </div>
-          )}
-          <div className="problem-entry">
-            <div className="label-row">
-              <label htmlFor="problem">
-                {state.questionImage
-                  ? "Review the question’s equation"
-                  : "Or type the equation"}
-              </label>
-              <span>Plain math or LaTeX</span>
-            </div>
-            <div className="problem-input-row">
-              <input
-                id="problem"
-                className="math-input"
-                value={state.problem}
-                placeholder="e.g. 3(x + 2) = 15"
-                maxLength={256}
-                autoComplete="off"
-                spellCheck={false}
-                onChange={(event) =>
-                  dispatch({ type: "problem", value: event.target.value })
-                }
-              />
-              <button
-                className={`button ${state.problemConfirmed ? "confirmed" : "primary"}`}
-                disabled={!state.problem.trim() || questionBusy}
-                onClick={() => dispatch({ type: "confirmProblem" })}
-              >
-                {state.problemConfirmed ? (
-                  <Check size={17} />
-                ) : (
-                  <ArrowRight size={17} />
-                )}
-                {state.problemConfirmed ? "Confirmed" : "Use this question"}
-              </button>
-            </div>
-            {state.problem && <MathPreview value={state.problem} />}
-            <div className="question-settings">
-              <p className="helper">
-                Check the reading before solving. For now, use one arithmetic
-                expression or linear equation.
-              </p>
-              <label className="variable-label" htmlFor="variable">
-                Variable{" "}
-                <input
-                  id="variable"
-                  aria-label="Variable letter"
-                  maxLength={1}
-                  value={state.variable}
-                  onChange={(event) =>
-                    dispatch({ type: "variable", value: event.target.value })
-                  }
-                />
-              </label>
-            </div>
-          </div>
-        </section>
-        <div className="flow-connector">
-          <span />
-          <ArrowDown size={16} />
-          <span />
-        </div>
-        <section className="steps-section" aria-labelledby="steps-heading">
-          {state.problemConfirmed && (
-            <div className="current-problem">
-              <span>WORKING ON</span>
-              <MathPreview value={state.problem} />
-              <CheckCircle2 size={16} />
-            </div>
-          )}
-          <div className="steps-heading">
-            <div>
-              <div className="eyebrow">MAKE YOUR THINKING VISIBLE</div>
-              <h2 id="steps-heading">Your working</h2>
-            </div>
-            <label className="touch-toggle">
-              <input
-                type="checkbox"
-                checked={state.touchDrawing}
-                onChange={(event) =>
-                  dispatch({ type: "touch", value: event.target.checked })
-                }
-              />
-              Finger drawing
-            </label>
-          </div>
-          <p className="steps-intro">
-            One step per space. We’ll check the math when you’re ready.
-          </p>
-          {state.steps.map((step, index) => (
-            <div
-              key={step.id}
-              ref={index === state.steps.length - 1 ? lastStep : undefined}
-              className="step-wrapper"
-            >
-              <div
-                className={`step-number ${step.result?.status === "verified" ? "done" : ""}`}
-              >
-                {step.result?.status === "verified" ? (
-                  <Check size={17} />
-                ) : (
-                  String(index + 1).padStart(2, "0")
+            <section className="question-card">
+              <div className="question-title-row">
+                <h1 id="question-heading">
+                  {state.problemConfirmed
+                    ? "Your question"
+                    : "What are we solving?"}
+                </h1>
+                {state.problemConfirmed && !editingQuestion && (
+                  <button
+                    className="text-button edit-question"
+                    onClick={() => setEditingQuestion(true)}
+                  >
+                    Edit
+                  </button>
                 )}
               </div>
-              <article
-                className="card step-card"
-                aria-label={`Step ${index + 1}`}
-              >
-                <div className="step-header">
-                  <div>
-                    <h3>Step {index + 1}</h3>
-                    <span>
-                      {index === 0
-                        ? "Start with your first move."
-                        : "Keep going from the line above."}
-                    </span>
+              {state.problemConfirmed && !editingQuestion ? (
+                <>
+                  <div className="question-equation">
+                    <MathPreview value={state.problem} />
                   </div>
-                  <div
-                    className="mode-switch"
-                    role="group"
-                    aria-label={`Step ${index + 1} input mode`}
-                  >
-                    <button
-                      className={step.mode === "handwriting" ? "selected" : ""}
-                      aria-pressed={step.mode === "handwriting"}
-                      onClick={() => {
-                        if (step.mode !== "handwriting")
-                          dispatch({
-                            type: "edit",
-                            id: step.id,
-                            patch: {
-                              mode: "handwriting",
-                              math: "",
-                              confirmed: false,
-                            },
-                          });
-                      }}
-                    >
-                      <PenLine size={15} />
-                      Write
-                    </button>
-                    <button
-                      className={step.mode === "typed" ? "selected" : ""}
-                      aria-pressed={step.mode === "typed"}
-                      onClick={() => {
-                        if (step.mode !== "typed")
-                          dispatch({
-                            type: "edit",
-                            id: step.id,
-                            patch: { mode: "typed", confirmed: true },
-                          });
-                      }}
-                    >
-                      <Keyboard size={16} />
-                      Type
-                    </button>
+                  {state.questionImage && (
+                    <details className="source-image">
+                      <summary>
+                        View original question <ChevronDown size={13} />
+                      </summary>
+                      <img
+                        src={state.questionImage}
+                        alt="Your uploaded math question"
+                      />
+                    </details>
+                  )}
+                  <div className="question-note">
+                    Show your thinking one step at a time. Gemini reviews each
+                    step when you check.
                   </div>
-                </div>
-                {step.mode === "handwriting" ? (
-                  <DrawingPad
-                    label={`Step ${index + 1}`}
-                    strokes={step.strokes}
-                    touchDrawing={state.touchDrawing}
-                    onChange={(strokes) =>
-                      dispatch({
-                        type: "edit",
-                        id: step.id,
-                        patch: { strokes, math: "", confirmed: false },
-                      })
-                    }
+                </>
+              ) : (
+                <div className="question-editor">
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="visually-hidden"
+                    aria-label="Upload question image"
+                    onChange={(event) => void upload(event.target.files?.[0])}
                   />
-                ) : (
-                  <div className="typed-entry">
-                    <label htmlFor={`typed-${step.id}`}>
-                      Write the equation for this step
+                  {!state.questionImage ? (
+                    <button
+                      className="upload-zone"
+                      onClick={() => fileInput.current?.click()}
+                    >
+                      <ImagePlus size={24} />
+                      <strong>Upload a question</strong>
+                      <span>A screenshot or photo · up to 8 MB</span>
+                    </button>
+                  ) : (
+                    <>
+                      <QuestionImage
+                        key={state.questionImage.slice(-80)}
+                        source={state.questionImage}
+                        busy={questionBusy}
+                        onRead={(crop) => void readQuestion(crop)}
+                      />
+                      <button
+                        className="text-button replace-image"
+                        onClick={() => fileInput.current?.click()}
+                      >
+                        Replace image
+                      </button>
+                    </>
+                  )}
+                  {questionBusy && (
+                    <p className="pending">
+                      <LoaderCircle className="spin" size={16} /> Reading your
+                      question…
+                    </p>
+                  )}
+                  {questionError && (
+                    <div className="notice error" role="alert">
+                      {questionError}
+                    </div>
+                  )}
+                  <div className="problem-entry">
+                    <label htmlFor="problem">
+                      {state.questionImage
+                        ? "Review the equation"
+                        : "Or type your equation"}
                     </label>
                     <input
-                      id={`typed-${step.id}`}
+                      id="problem"
                       className="math-input"
-                      placeholder="e.g. 3x + 6 = 15"
-                      value={step.math}
+                      value={state.problem}
+                      placeholder="e.g. Differentiate sin(x²)"
                       maxLength={256}
                       autoComplete="off"
                       spellCheck={false}
                       onChange={(event) =>
-                        dispatch({
-                          type: "edit",
-                          id: step.id,
-                          patch: { math: event.target.value, confirmed: true },
-                        })
+                        dispatch({ type: "problem", value: event.target.value })
                       }
                     />
-                    {step.math && <MathPreview value={step.math} />}
-                  </div>
-                )}
-                {step.mode === "handwriting" && step.math && (
-                  <div className="reading">
-                    <div className="label-row">
-                      <label htmlFor={`reading-${step.id}`}>
-                        <ScanLine size={15} />
-                        Math Buddy read
+                    {state.problem && <MathPreview value={state.problem} />}
+                    <div className="question-settings">
+                      <span className="helper">Plain math or LaTeX</span>
+                      <label className="variable-label" htmlFor="variable">
+                        Variable{" "}
+                        <input
+                          id="variable"
+                          aria-label="Variable letter"
+                          maxLength={1}
+                          value={state.variable}
+                          onChange={(event) =>
+                            dispatch({
+                              type: "variable",
+                              value: event.target.value,
+                            })
+                          }
+                        />
                       </label>
-                      <span>
-                        {step.confirmed
-                          ? "Confirmed reading"
-                          : "Review before checking"}
-                      </span>
                     </div>
-                    <MathPreview value={step.math} />
-                    <input
-                      id={`reading-${step.id}`}
-                      className="math-input"
-                      value={step.math}
-                      maxLength={256}
-                      spellCheck={false}
-                      autoComplete="off"
-                      onChange={(event) =>
-                        dispatch({
-                          type: "edit",
-                          id: step.id,
-                          patch: { math: event.target.value, confirmed: false },
-                        })
-                      }
-                    />
-                    <p className="helper">
-                      Misread a symbol? Edit the line above. Your handwriting
-                      stays as you wrote it.
-                    </p>
-                  </div>
-                )}
-                <Feedback
-                  step={step}
-                  onCorrection={() => void checkStep(step.id, true)}
-                />
-                <div className="step-footer">
-                  <span className="step-footer-note">
-                    {!state.problemConfirmed
-                      ? "Confirm your question above to begin."
-                      : step.math && !step.confirmed
-                        ? "Does the reading match your writing?"
-                        : "Your approach. We check the equivalence."}
-                  </span>
-                  <div className="step-actions">
-                    {step.mode === "handwriting" && step.math && (
-                      <button
-                        className="text-button"
-                        disabled={!!step.pending || online === false}
-                        onClick={() => void readStep(step.id)}
-                      >
-                        Read again
-                      </button>
-                    )}
                     <button
-                      className="button primary"
-                      disabled={
-                        !state.problemConfirmed ||
-                        !!step.pending ||
-                        online === false ||
-                        (step.mode === "typed"
-                          ? !step.math.trim()
-                          : !step.strokes.length && !step.math.trim())
-                      }
+                      className="button primary use-question"
+                      disabled={!state.problem.trim() || questionBusy}
                       onClick={() => {
-                        if (step.mode === "handwriting" && !step.math)
-                          void readStep(step.id);
-                        else void checkStep(step.id);
+                        dispatch({ type: "confirmProblem" });
+                        setEditingQuestion(false);
                       }}
                     >
-                      {step.pending ? (
-                        <LoaderCircle className="spin" size={17} />
-                      ) : (
-                        <CheckCircle2 size={17} />
-                      )}
-                      {step.pending
-                        ? step.pending.kind === "reading"
-                          ? "Reading…"
-                          : "Checking…"
-                        : step.mode === "handwriting" &&
-                            step.math &&
-                            !step.confirmed
-                          ? "Confirm & check"
-                          : "Check step"}
+                      Use this question <ArrowRight size={16} />
                     </button>
+                    {state.problemConfirmed && (
+                      <button
+                        className="text-button"
+                        onClick={() => setEditingQuestion(false)}
+                      >
+                        Back to my work
+                      </button>
+                    )}
                   </div>
                 </div>
-              </article>
+              )}
+            </section>
+            <button
+              className="text-button guidance-toggle"
+              aria-expanded={help}
+              aria-controls="workspace-help"
+              onClick={() => setHelp(!help)}
+            >
+              <CircleHelp size={17} /> A little guidance{" "}
+              <ChevronDown className={help ? "rotated" : ""} size={13} />
+            </button>
+            {help && (
+              <section className="help-panel" id="workspace-help">
+                <h2>One transformation at a time</h2>
+                <p>
+                  Write one equation in each box, then tap the check button
+                  beside it. Review the handwriting reading and tap again to
+                  confirm and check.
+                </p>
+                <p>
+                  A warning gives you a hint. You can ask for a correction or
+                  keep going with your own approach.
+                </p>
+                <p>
+                  Use Pen, Eraser, and Undo below each box. With finger drawing
+                  off, use your finger to scroll and Apple Pencil to write.
+                </p>
+                <p>
+                  Gemini reviews simple and advanced math. For calculus, include
+                  whether you want to differentiate or integrate and the
+                  variable. Typing works too.
+                </p>
+                <button className="text-button" onClick={() => setHelp(false)}>
+                  Got it <X size={13} />
+                </button>
+              </section>
+            )}
+            <div className="sidebar-footnote">
+              <span className="local-dot" /> Drafts stay here. Checks and image
+              readings go to Gemini.
             </div>
-          ))}
-          <button
-            className="add-step"
-            disabled={state.steps.length >= 34}
-            onClick={addStep}
-          >
-            <Plus size={19} />
-            <span>Add next step</span>
-            <span className="add-step-note">
-              A fresh space for your next move
-            </span>
-          </button>
-          <div className="working-summary">
-            <span>
-              {verifiedCount
-                ? `${verifiedCount} ${verifiedCount === 1 ? "step" : "steps"} verified`
-                : "Take it one step at a time."}
-            </span>
-            <span>Different valid methods are welcome.</span>
-          </div>
-        </section>
+          </aside>
+          <section className="steps-section" aria-labelledby="steps-heading">
+            <div className="steps-heading">
+              <div>
+                <h2 id="steps-heading">Show your work</h2>
+                <p>Write one transformation in each box.</p>
+              </div>
+              <label className="touch-toggle">
+                <input
+                  type="checkbox"
+                  checked={state.touchDrawing}
+                  onChange={(event) =>
+                    dispatch({ type: "touch", value: event.target.checked })
+                  }
+                />{" "}
+                Finger drawing
+              </label>
+            </div>
+            {!state.problemConfirmed && (
+              <p className="setup-note">
+                <CircleHelp size={14} /> Add and confirm your question to start
+                checking.
+              </p>
+            )}
+            <div className="steps-list">
+              {state.steps.map((step, index) => {
+                const verified = step.result?.status === "verified";
+                const needsReview =
+                  step.mode === "handwriting" && !!step.math && !step.confirmed;
+                const checkLabel = step.pending
+                  ? step.pending.kind === "reading"
+                    ? "Reading"
+                    : "Checking"
+                  : needsReview
+                    ? "Confirm"
+                    : "Check";
+                return (
+                  <div
+                    key={step.id}
+                    ref={
+                      index === state.steps.length - 1 ? lastStep : undefined
+                    }
+                    className="step-wrapper"
+                  >
+                    <article
+                      className={`step-card ${verified ? "is-verified" : step.result?.status === "issue" ? "has-issue" : ""}`}
+                      aria-label={`Step ${index + 1}`}
+                      aria-busy={!!step.pending}
+                    >
+                      <div className="step-main">
+                        <div className="step-header">
+                          <h3>
+                            <span
+                              className={`step-number ${verified ? "done" : ""}`}
+                            >
+                              {verified ? <Check size={12} /> : index + 1}
+                            </span>{" "}
+                            STEP {index + 1}
+                          </h3>
+                          <div
+                            className="mode-switch"
+                            role="group"
+                            aria-label={`Step ${index + 1} input mode`}
+                          >
+                            <button
+                              className={
+                                step.mode === "handwriting" ? "selected" : ""
+                              }
+                              aria-pressed={step.mode === "handwriting"}
+                              onClick={() => {
+                                if (step.mode !== "handwriting")
+                                  dispatch({
+                                    type: "edit",
+                                    id: step.id,
+                                    patch: {
+                                      mode: "handwriting",
+                                      math: "",
+                                      confirmed: false,
+                                    },
+                                  });
+                              }}
+                            >
+                              <PenLine size={14} /> Write
+                            </button>
+                            <button
+                              className={
+                                step.mode === "typed" ? "selected" : ""
+                              }
+                              aria-pressed={step.mode === "typed"}
+                              onClick={() => {
+                                if (step.mode !== "typed")
+                                  dispatch({
+                                    type: "edit",
+                                    id: step.id,
+                                    patch: { mode: "typed", confirmed: true },
+                                  });
+                              }}
+                            >
+                              <Keyboard size={15} /> Type
+                            </button>
+                          </div>
+                        </div>
+                        {step.mode === "handwriting" ? (
+                          <DrawingPad
+                            label={`Step ${index + 1}`}
+                            strokes={step.strokes}
+                            touchDrawing={state.touchDrawing}
+                            onChange={(strokes) =>
+                              dispatch({
+                                type: "edit",
+                                id: step.id,
+                                patch: { strokes, math: "", confirmed: false },
+                              })
+                            }
+                          />
+                        ) : (
+                          <div className="typed-entry">
+                            <label
+                              className="visually-hidden"
+                              htmlFor={`typed-${step.id}`}
+                            >
+                              Equation for step {index + 1}
+                            </label>
+                            <input
+                              id={`typed-${step.id}`}
+                              className="math-input"
+                              placeholder={
+                                index === 0
+                                  ? "Your first transformation…"
+                                  : "What comes next?"
+                              }
+                              value={step.math}
+                              maxLength={256}
+                              autoComplete="off"
+                              spellCheck={false}
+                              onChange={(event) =>
+                                dispatch({
+                                  type: "edit",
+                                  id: step.id,
+                                  patch: {
+                                    math: event.target.value,
+                                    confirmed: true,
+                                  },
+                                })
+                              }
+                            />
+                            {step.math && <MathPreview value={step.math} />}
+                          </div>
+                        )}
+                        {step.mode === "handwriting" && step.math && (
+                          <details className="reading" open={!step.confirmed}>
+                            <summary>
+                              <ScanLine size={14} />{" "}
+                              {step.confirmed
+                                ? "View recognized equation"
+                                : "Review recognized equation"}{" "}
+                              <ChevronDown size={13} />
+                            </summary>
+                            <div className="label-row">
+                              <label htmlFor={`reading-${step.id}`}>
+                                <ScanLine size={14} /> Math Buddy read
+                              </label>
+                              <span>
+                                {step.confirmed
+                                  ? "Confirmed reading"
+                                  : "Review, then tap Confirm →"}
+                              </span>
+                            </div>
+                            <MathPreview value={step.math} />
+                            <input
+                              id={`reading-${step.id}`}
+                              className="math-input"
+                              value={step.math}
+                              maxLength={256}
+                              spellCheck={false}
+                              autoComplete="off"
+                              onChange={(event) =>
+                                dispatch({
+                                  type: "edit",
+                                  id: step.id,
+                                  patch: {
+                                    math: event.target.value,
+                                    confirmed: false,
+                                  },
+                                })
+                              }
+                            />
+                            <div className="reading-footer">
+                              <span className="helper">
+                                Edit any misread symbols. Your ink stays here.
+                              </span>
+                              <button
+                                className="text-button"
+                                disabled={!!step.pending || online === false}
+                                onClick={() => void readStep(step.id)}
+                              >
+                                Read again
+                              </button>
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                      <div className="check-rail">
+                        <button
+                          className="check-button"
+                          aria-label={`${needsReview ? "Confirm reading and check" : "Check"} step ${index + 1}`}
+                          title={
+                            !state.problemConfirmed
+                              ? "Confirm your question first"
+                              : needsReview
+                                ? "Confirm reading and check this step"
+                                : `Check step ${index + 1}`
+                          }
+                          disabled={
+                            !state.problemConfirmed ||
+                            !!step.pending ||
+                            online === false ||
+                            (step.mode === "typed"
+                              ? !step.math.trim()
+                              : !step.strokes.length && !step.math.trim())
+                          }
+                          onClick={() => {
+                            if (step.mode === "handwriting" && !step.math)
+                              void readStep(step.id);
+                            else void checkStep(step.id);
+                          }}
+                        >
+                          {step.pending ? (
+                            <LoaderCircle className="spin" size={21} />
+                          ) : (
+                            <Check size={22} strokeWidth={2.5} />
+                          )}
+                        </button>
+                        <span className="check-label">{checkLabel}</span>
+                      </div>
+                    </article>
+                    <Feedback
+                      step={step}
+                      onCorrection={() => void checkStep(step.id, true)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <button
+              className="add-step"
+              disabled={state.steps.length >= 34}
+              onClick={addStep}
+            >
+              <Plus size={17} /> Add next step
+            </button>
+            <div className="working-summary">
+              <span>
+                {verifiedCount
+                  ? `${verifiedCount} ${verifiedCount === 1 ? "step" : "steps"} reviewed as correct`
+                  : "Your pace. Your approach."}
+              </span>
+              <span>One step at a time.</span>
+            </div>
+          </section>
+        </div>
         <footer className="page-footer">
           <span>
-            <ShieldCheck size={15} />
             {recognitionReady
-              ? "Local recognition & checking"
-              : "Local checking · recognition setup needed"}
+              ? "Gemini reads & reviews every step"
+              : "Gemini API key needed"}
           </span>
           <span className="draft-status">{draftStatus}</span>
           <a href="/docs" target="_blank" rel="noreferrer">

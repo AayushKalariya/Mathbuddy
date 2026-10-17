@@ -201,7 +201,7 @@ export default function DrawingPad({
       </div>
       <div className="paper">
         {!strokes.length && !draft && (
-          <span className="paper-placeholder">Write your next line here…</span>
+          <span className="paper-placeholder">Write your next step here…</span>
         )}
         <svg
           viewBox={`0 0 ${INK_WIDTH} ${INK_HEIGHT}`}
@@ -218,9 +218,15 @@ export default function DrawingPad({
           onLostPointerCapture={finish}
         >
           {strokes.map((stroke, i) => (
-            <path key={i} d={polygonPath(outline(stroke))} fill="#202d35" />
+            <path
+              key={i}
+              d={polygonPath(outline(stroke))}
+              fill="currentColor"
+            />
           ))}
-          {draft && <path d={polygonPath(outline(draft))} fill="#202d35" />}
+          {draft && (
+            <path d={polygonPath(outline(draft))} fill="currentColor" />
+          )}
         </svg>
       </div>
     </div>
