@@ -1,0 +1,16 @@
+.venv/
+.checker-venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+tools/
+models/
+data/
+sample_work/
+certs/
+*.log
+artifacts/
+node_modules/
+frontend/dist/
+*.tsbuildinfo
