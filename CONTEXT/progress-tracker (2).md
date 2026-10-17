@@ -1,6 +1,6 @@
 # Math Buddy — Progress Tracker
 
-Updated: October 15, 2026.
+Updated: October 17, 2026.
 
 ## Current Phase
 
@@ -132,3 +132,25 @@ Typed API names, contracts, grammar bounds, test runner, and checker dependencie
 - Original plan content was preserved; the recognition environment and third-party demo were not edited.
 - Actual iPad testing of this new checker is not claimed; the browser explorer was verified on the desktop.
 - User deferred the external AI API/sidebar and requested focusing on upload, separate writing areas, and manual checks. Those boundaries are now integrated; actual iPad behavior still needs testing.
+
+
+### October 17, 2026 — Reference-based interface update
+
+- Implemented the user-provided navy/purple/mint visual style, question sidebar, separate writing boxes, and right-side check buttons. Narrow screens stack the question above the work.
+- Kept upload/crop, question editing, typed fallback, pen/eraser/undo, reading confirmation, warning continuation, correction-on-request, and browser draft handling. Confirmed readings collapse; new readings open for review.
+- Built the frontend successfully with strict TypeScript checking; all 18 existing frontend tests passed.
+- Live browser verification: typed correct/incorrect steps, hint and requested correction, recovery after fixing an equation, adding boxes, seven mouse-drawn strokes, clear/undo recovery, recognition and editable confirmation, and a verified handwritten result. The model read X = 4; the reading was corrected to x=4 before checking.
+- Checked desktop, 768px iPad portrait, 390px phone, and 320px narrow widths; no horizontal document overflow or browser console errors observed. These browser checks do not establish actual Pencil/palm behavior.
+- Preview: artifacts/workspace-redesign.jpg. Tests used a separate localhost:8001 draft origin, preserving existing 127.0.0.1 drafts.
+- The user reports the existing application works. The redesigned interface still needs a real iPad/Pencil check. Backend, recognition model, dependencies, and the protected plan were unchanged.
+
+
+### October 17, 2026 — Gemini on every workspace check
+
+- User authorized Gemini for simple and advanced problems, superseding earlier external-API deferral. Added a local ignored `.env` with an empty key field and configurable model, blank `.env.example`, server-only dotenv settings, and setup documentation.
+- Added asynchronous Gemini REST calls using pinned runtime HTTPX and python-dotenv; image preprocessing/limits, bounded structured Pydantic responses, safe error mapping, and server-owned revision metadata. API keys are sent in headers only and never returned by status endpoints or included in prompts.
+- Default `/api/recognize` and `/api/check-step` always use Gemini. Preserved original offline tools at explicit `/api/local/` routes and the CLI; no automatic local fallback. Question reading preserves task instructions; confirmed readings remain editable and authoritative.
+- Added Gemini attribution, cautious positive wording, setup notice, advanced-task presentation, cloud data-flow notice, and suggested-correction wording. Draft/ink recovery, reading confirmation, and stale-result protection remain in place.
+- Automated verification: 102 backend tests and 22 frontend tests pass; strict TypeScript/Vite build succeeds; pip check reports no broken dependencies. Gemini HTTP traffic is mocked in automated tests, covering easy/hard requests, image reads, history, opt-in corrections, earlier-error guards, missing keys, quotas, malformed/blocked outputs, and credential redaction.
+- Browser verification on the isolated localhost:8001 draft: restored writing, calculus task entry/confirmation, typed checking, setup notice, and actionable missing-key failure with work preserved. Preview: artifacts/gemini-setup-needed.jpg.
+- Live Gemini accuracy/model access is NOT verified: GEMINI_API_KEY remained empty during this implementation. Real Google calls and actual iPad/Pencil checks require the user's configured key/device. The existing user server on port 8000 was left running; restart it to load backend changes.

@@ -11,6 +11,8 @@ export type CheckResult = {
   correction_available: boolean;
   warnings: string[];
   verification_basis: string;
+  reviewer?: "local" | "gemini";
+  model?: string;
   step_id: string;
   revision: number;
   context_revision: number;

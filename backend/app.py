@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from typing import Literal
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +12,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from backend.checking.checker import check_step
 from backend.models import CheckRequest, CheckResult
+from backend.gemini import GeminiError, gemini
 from backend.recognition.service import MAX_IMAGE_BYTES, RecognitionError, recognition
 
 MAX_BODY_BYTES = 32_768
@@ -22,13 +24,15 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(
-    title="Math Buddy — typed checker",
-    description=("Local prototype for arithmetic and one-variable linear math over the reals. "
+    title="Math Buddy — Gemini step tutor",
+    description=("Gemini reads images and reviews every workspace step, simple or advanced. "
+                 "Requires GEMINI_API_KEY in the server-only .env file and internet access. "
+                 "The explicit /api/local routes retain the older exact checker and local recognition. "
                  "Hints appear first. Set request_correction=true to request a supported correction. "
                  "Set input_format=latex for the supported OCR-LaTeX subset. "
-                 "Local handwriting recognition and a React writing workspace are available. "
+                 "Handwriting readings require confirmation before checking. "
                  "Drafts are stored only in the browser; no server-side saved sessions yet."),
-    version="0.2.0",
+    version="0.3.0",
     docs_url=None,
     redoc_url=None,
     lifespan=lifespan,
@@ -48,7 +52,7 @@ class BodySizeLimit:
             return
         chunks: list[Message] = []
         total = 0
-        limit = MAX_IMAGE_BYTES if scope["path"] == "/api/recognize" else self.max_bytes
+        limit = MAX_IMAGE_BYTES if scope["path"] in ("/api/recognize", "/api/local/recognize") else self.max_bytes
         while True:
             message = await receive()
             if message["type"] == "http.disconnect":
@@ -100,34 +104,54 @@ def local_docs():
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "component": "typed-checker", "version": "0.2.0"}
+    return {"status": "ok", "component": "gemini-step-tutor", "version": "0.3.0"}
 
 
 @app.get("/api/recognition-status")
 def recognition_status() -> dict[str, object]:
-    return recognition.configuration()
+    return gemini.configuration()
 
 
 @app.post("/api/recognize")
-async def recognize_image(request: Request):
+async def recognize_image(request: Request, purpose: Literal["question", "step"] = "step"):
     """Read a raw PNG/JPEG/WebP body. Recognition must be reviewed before checking."""
     if request.headers.get("content-type", "").split(";")[0] not in ("image/png", "image/jpeg", "image/webp"):
         return JSONResponse({"detail": "Use a PNG, JPEG, or WebP image."}, status_code=415)
     try:
-        return await recognition.recognize(await request.body())
-    except RecognitionError as error:
+        return await gemini.recognize(await request.body(), purpose)
+    except (RecognitionError, GeminiError) as error:
         return JSONResponse({"detail": str(error)}, status_code=error.status_code)
 
 
 @app.post("/api/check-step", response_model=CheckResult, response_model_exclude_none=True)
-def check(request: CheckRequest) -> CheckResult:
+async def check(request: CheckRequest):
     """Check one transition; include all earlier lines in history to retain warnings.
 
     history is ordered and excludes previous_step. Return metadata/fingerprint
     lets the workspace discard results for an edited step or context. There is
     no server-side session state or automatic revision invalidation in this unit.
     """
+    try:
+        return await gemini.check(request)
+    except GeminiError as error:
+        return JSONResponse({"detail": str(error)}, status_code=error.status_code)
+
+
+@app.post("/api/local/check-step", response_model=CheckResult, response_model_exclude_none=True)
+def local_check(request: CheckRequest) -> CheckResult:
+    """Explicit offline exact checker. The workspace always uses the Gemini route."""
     return check_step(request)
+
+
+@app.post("/api/local/recognize")
+async def local_recognize(request: Request):
+    """Explicit legacy local reader, not a fallback from Gemini."""
+    if request.headers.get("content-type", "").split(";")[0] not in ("image/png", "image/jpeg", "image/webp"):
+        return JSONResponse({"detail": "Use a PNG, JPEG, or WebP image."}, status_code=415)
+    try:
+        return await recognition.recognize(await request.body())
+    except RecognitionError as error:
+        return JSONResponse({"detail": str(error)}, status_code=error.status_code)
 
 
 # check_dir=False permits API-only use before the first frontend build.

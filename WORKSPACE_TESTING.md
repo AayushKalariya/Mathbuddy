@@ -1,13 +1,13 @@
 # Test the writing workspace
 
-The workspace connects screenshot upload, handwritten/typed step areas, local
-UniMERNet recognition, and the exact checker. No AI API key or paid service is used.
-Arithmetic and one-variable linear equations remain the supported math; recognition
-can read notation that the checker cannot yet verify.
+The workspace uses Gemini to read questions/handwriting and review **every**
+submitted step, including simple and advanced math. Add your API key to the
+laptop’s `.env` first; see [GEMINI_SETUP.md](GEMINI_SETUP.md). The laptop needs
+internet access. Original offline tools remain at explicit `/api/local/` routes.
 
 ## 1. Start on Windows
 
-Open PowerShell in C:\Users\aayus\Downloads\Mathbuddy. If the earlier API server is
+Open PowerShell in C:\Users\aayus\Downloads\Swamphacks. If the earlier API server is
 still running in another terminal, press Ctrl+C there before starting the updated
 app. An already-running Python process will not load backend edits.
 
@@ -46,11 +46,23 @@ py -3.10 -m venv .checker-venv
 .\.checker-venv\Scripts\python.exe -m pip install -r backend/requirements-lock.txt
 ```
 
-Recognition uses the existing .venv and tools/UniMERNet/configs/demo.yaml. Its
+The optional legacy local reader uses the existing .venv and tools/UniMERNet/configs/demo.yaml. Its
 model/tokenizer paths point at models/unimernet_tiny inside that vendor directory.
 Do not install its PyTorch dependencies into .checker-venv. Model files and
 dependencies must already be present. The worker forces Hugging Face offline mode.
 The running setup was observed using CPU; no GPU performance is claimed.
+
+## Interface update (October 17, 2026)
+
+The workspace follows the supplied dark navy reference. The question is beside
+the drawing boxes on tablet/laptop widths and above them on phones. Each box has
+a purple check button on its right; verified steps turn mint green, and warnings
+appear immediately below the relevant box. Add next step creates another box.
+The editor collapses after Use this question; Edit reopens it.
+
+The built frontend is already updated. Restart/start the server with the commands
+above and reload Safari to load the new assets. Gemini runtime dependencies are
+installed on this laptop; use backend/requirements.txt when recreating the environment.
 
 ## 2. Upload and confirm a question
 
@@ -59,8 +71,8 @@ The running setup was observed using CPU; no GPU performance is claimed.
 2. For multiple questions or prose, select **Select one question**, then drag
    around the equation. Select **Read question**. Reading the full image also works.
 3. Review the rendered math and editable equation. Correct misread symbols by
-   typing. Prose/word problems and arbitrary LaTeX are unsupported; enter the
-   mathematical expression or equation to work on.
+   typing. Include task words such as differentiate/integrate and any assumptions
+   so the reviewer knows what you are trying to do. Keep it under 256 characters.
 4. Select **Use this question**. Variable defaults to x; select the actual letter
    if different. The variable is not the numerical answer.
 
@@ -75,15 +87,15 @@ Typing the question directly works without uploading an image.
    needs actual iPad verification; pinch zoom can be started outside the pad.
 2. **Pen** writes; **Eraser** removes an entire touched stroke; **Undo** restores
    the previous drawing action in this tab. **Clear** can also be undone.
-3. Select **Check step** to read the handwriting locally. Initial use loads the
-   model and may take longer than subsequent readings.
+3. Select the **check button on the right** to send the handwriting to Gemini for a proposed reading.
 4. Review **Math Buddy read**. Edit misread math; handwriting remains intact.
-   Select **Confirm & check** for the mathematical verdict.
+   Select the same side button, now labelled **Confirm**, for Gemini’s mathematical assessment.
+   Confirmed readings collapse under **View recognized equation** and can be reopened.
 5. Select **Add next step**. Warnings do not block continuing. Confirm the readings
    of earlier lines before checking later ones so the checker knows what was
    written. An earlier mathematical error does not become a trusted premise.
 
-The **Type** switch is a fallback and a way to test math separately from recognition.
+The **Type** button in each box is a fallback and a way to test math separately from recognition.
 Typed steps go directly to checking. Switching back to **Write** retains ink and
 asks for a fresh reading.
 
@@ -93,17 +105,18 @@ Use 3(x+2)=15, then:
 
 | Step / action | Expected |
 |---|---|
-| Step 1: 3x+6=15 | Step verified |
+| Step 1: 3x+6=15 | Expected valid, labelled Reviewed by Gemini |
 | Step 2: 3x=11 | Warning and subtraction hint; correction hidden |
-| Show one correction | One valid correction: 3*x = 9 |
+| Show one correction | Suggested next step, such as 3*x = 9; wording may vary |
 | Change Step 2 to 3x=9 and check | Step verified |
 | Step 3: x=3 | Step verified |
 | Change Step 1 to 3x+6=16 | Its feedback and all later feedback clear |
 | Recheck later work without fixing Step 1 | Earlier-work warning remains |
 
 For a different valid approach, start a new question and use x+2=5, then x=3.
-For unsupported math, use x^2=9; expect explicit unsupported feedback. Mathematical
-equivalence does not measure efficiency.
+For a harder test, use `Differentiate sin(x^2) with respect to x`; try `cos(x^2)`
+and then `2x cos(x^2)`. Gemini feedback is not deterministic and requires live
+evaluation; AI review does not establish a symbolic proof.
 
 ## 4. Test on iPad
 

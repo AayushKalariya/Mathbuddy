@@ -1,6 +1,28 @@
 # Math Buddy — Project Overview
 
-Updated: October 15, 2026.
+## Current Gemini decision — October 17, 2026
+
+The user explicitly selected the Gemini API hackathon track and authorized Gemini
+for **all** submitted workspace steps, easy and hard, despite additional requests.
+This supersedes earlier local-only inference/API-deferral decisions below.
+The current default `/api/check-step` and `/api/recognize` use Gemini exclusively;
+there is no automatic local fallback. `.env` stores the server-only API key,
+`.env.example` is the blank template, and `GEMINI_SETUP.md` documents setup.
+The legacy exact checker/recognizer remain at explicit `/api/local/` endpoints
+and the CLI. The recognition environment and protected plan remain unchanged.
+
+Handwriting is read, reviewed/edited by the student, then checked as confirmed
+text against the question/task and full earlier history. Gemini returns bounded,
+validated structured output. UI results are labelled Reviewed by Gemini; positive
+AI assessments are not symbolic proofs. Hints come before corrections, earlier
+errors retain warnings, and uncertain work must not receive a green verdict.
+The key remains server-side; selected images/math are sent to Google. Browser
+drafts remain device/origin-specific. Internet and the key’s Google quota apply.
+No chat/voice sidebar, account system, paid subscription, or billing configuration
+was added. Existing keyless servers must restart to load the changed backend.
+
+
+Updated: October 17, 2026.
 Status: typed checker and first writing workspace implemented; actual iPad testing and laptop session saving remain pending.
 
 ## Implemented Milestone
