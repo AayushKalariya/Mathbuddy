@@ -5,6 +5,7 @@ export type CheckResult = {
     "verified" | "issue" | "needs_clarification" | "incomplete" | "unsupported";
   transition_status: "valid" | "invalid" | "unresolved";
   context_status: "consistent" | "earlier_issue" | "unresolved";
+  is_final_answer: boolean;
   message: string;
   hint?: string;
   correction?: string;
@@ -24,6 +25,8 @@ export type Step = {
   math: string;
   mode: "handwriting" | "typed";
   confirmed: boolean;
+  inkHistory?: Stroke[][];
+  drawing?: boolean;
   result?: CheckResult;
   pending?: { token: string; kind: "reading" | "checking" };
   error?: string;
@@ -59,6 +62,41 @@ export const newWorkspace = (): Workspace => ({
   touchDrawing: false,
 });
 
+export function isFinalAnswer(step: Step): boolean {
+  const result = step.result;
+  return (
+    !!result &&
+    result.is_final_answer === true &&
+    result.status === "verified" &&
+    result.transition_status === "valid" &&
+    result.context_status === "consistent" &&
+    result.warnings.length === 0 &&
+    step.confirmed &&
+    !step.pending &&
+    !step.error &&
+    !step.stale
+  );
+}
+
+export function completedStep(state: Workspace): Step | undefined {
+  const lastWritten = [...state.steps]
+    .reverse()
+    .find((step) => step.math.trim() || step.strokes.length);
+  return lastWritten && isFinalAnswer(lastWritten) ? lastWritten : undefined;
+}
+
+function untouchedBox(step: Step): boolean {
+  return (
+    step.revision === 0 &&
+    !step.math.trim() &&
+    step.strokes.length === 0 &&
+    !step.inkHistory?.length &&
+    !step.pending &&
+    !step.result &&
+    !step.stale
+  );
+}
+
 // Includes every premise, even an unverified/incorrect one, so edits cannot
 // leave dependent feedback current. Results are not themselves premises.
 export function contextKey(state: Workspace, index: number): string {
@@ -86,9 +124,7 @@ export function checkPayload(
   const step = state.steps[index];
   const earlier = state.steps.slice(0, index);
   if (earlier.some((s) => !s.confirmed || !s.math.trim()))
-    throw new Error(
-      "Read and confirm each earlier step first. A math warning will not block continuing.",
-    );
+    throw new Error("Read and confirm each earlier step first.");
   if (!step.math.trim()) throw new Error("Enter or read this step first.");
   if ([...earlier, step].some((s) => s.math.length > 256))
     throw new Error("Each equation must be 256 characters or fewer.");
@@ -112,7 +148,10 @@ export type Action =
   | { type: "image"; image: string }
   | { type: "variable"; value: string }
   | { type: "touch"; value: boolean }
-  | { type: "add" }
+  | { type: "beginInk"; id: string }
+  | { type: "endInk"; id: string }
+  | { type: "undoInk"; id: string }
+  | { type: "clearInk"; id: string }
   | {
       type: "edit";
       id: string;
@@ -146,10 +185,6 @@ function invalidate(steps: Step[], from: number): Step[] {
 export function reducer(state: Workspace, action: Action): Workspace {
   if (action.type === "restore") return action.state;
   if (action.type === "touch") return { ...state, touchDrawing: action.value };
-  if (action.type === "add")
-    return state.steps.length >= 34
-      ? state
-      : { ...state, steps: [...state.steps, newStep()] };
   if (action.type === "confirmProblem")
     return { ...state, problemConfirmed: !!state.problem.trim() };
   if (
@@ -175,11 +210,47 @@ export function reducer(state: Workspace, action: Action): Workspace {
   const index = state.steps.findIndex((s) => s.id === action.id);
   if (index < 0) return state;
   const step = state.steps[index];
-  if (action.type === "edit") {
+  if (action.type === "endInk") {
+    const steps = [...state.steps];
+    steps[index] = { ...step, drawing: false };
+    return { ...state, steps };
+  }
+  if (
+    action.type === "edit" ||
+    action.type === "beginInk" ||
+    action.type === "undoInk" ||
+    action.type === "clearInk"
+  ) {
+    const history = step.inkHistory ?? [];
+    if (action.type === "undoInk" && !history.length) return state;
+    if (action.type === "clearInk" && !step.strokes.length) return state;
+    const patch =
+      action.type === "edit"
+        ? action.patch
+        : {
+            math: "",
+            confirmed: false,
+            strokes:
+              action.type === "undoInk"
+                ? history.at(-1)!
+                : action.type === "clearInk"
+                  ? []
+                  : step.strokes,
+            inkHistory:
+              action.type === "undoInk"
+                ? history.slice(0, -1)
+                : [...history.slice(-49), step.strokes],
+          };
     const steps = invalidate(state.steps, index);
     steps[index] = {
       ...steps[index],
-      ...action.patch,
+      ...patch,
+      drawing:
+        action.type === "beginInk"
+          ? true
+          : action.type === "edit" && action.patch.mode
+            ? false
+            : step.drawing,
       revision: step.revision + 1,
     };
     return { ...state, steps };
@@ -205,6 +276,7 @@ export function reducer(state: Workspace, action: Action): Workspace {
     return state;
   const steps = [...state.steps];
   if (action.type === "read") {
+    if (step.drawing || step.pending?.kind !== "reading") return state;
     const invalidated = invalidate(steps, index);
     invalidated[index] = {
       ...invalidated[index],
@@ -216,6 +288,7 @@ export function reducer(state: Workspace, action: Action): Workspace {
   }
   if (action.type === "result") {
     if (
+      step.pending?.kind !== "checking" ||
       action.result.step_id !== step.id ||
       action.result.revision !== step.revision ||
       action.result.context_revision !== state.problemRevision
@@ -228,6 +301,27 @@ export function reducer(state: Workspace, action: Action): Workspace {
       result: action.result,
       stale: false,
     };
+    // Older drafts can already have an extra blank box. Never discard edits or ink.
+    if (
+      isFinalAnswer(steps[index]) &&
+      steps.slice(index + 1).every(untouchedBox)
+    ) {
+      return { ...state, steps: steps.slice(0, index + 1) };
+    }
+    if (
+      index === steps.length - 1 &&
+      steps.length < 34 &&
+      !action.result.is_final_answer &&
+      action.result.status === "verified" &&
+      action.result.transition_status === "valid" &&
+      action.result.context_status === "consistent"
+    ) {
+      steps.push({
+        ...newStep(),
+        mode: step.mode,
+        confirmed: step.mode === "typed",
+      });
+    }
   } else steps[index] = { ...step, pending: undefined, error: action.error };
   return { ...state, steps };
 }
@@ -236,7 +330,14 @@ export function persisted(state: Workspace): Workspace {
   return {
     ...state,
     steps: state.steps.map(
-      ({ pending: _pending, error: _error, result: _result, ...s }) => ({
+      ({
+        pending: _pending,
+        error: _error,
+        result: _result,
+        inkHistory: _history,
+        drawing: _drawing,
+        ...s
+      }) => ({
         ...s,
         stale: s.stale || !!_result,
       }),

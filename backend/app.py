@@ -11,8 +11,9 @@ from fastapi.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from backend.checking.checker import check_step
-from backend.models import CheckRequest, CheckResult
+from backend.models import CheckRequest, CheckResult, HintRequest, HintResult
 from backend.gemini import GeminiError, gemini
+from backend.recognition.glm import glm_recognition
 from backend.recognition.service import MAX_IMAGE_BYTES, RecognitionError, recognition
 
 MAX_BODY_BYTES = 32_768
@@ -21,14 +22,15 @@ MAX_BODY_BYTES = 32_768
 async def lifespan(application: FastAPI):
     yield
     await recognition.close()
+    await glm_recognition.close()
 
 
 app = FastAPI(
-    title="Math Buddy — Gemini step tutor",
-    description=("Gemini reads images and reviews every workspace step, simple or advanced. "
+    title="Math Buddy — local OCR and Gemini step tutor",
+    description=("GLM-OCR reads images on the laptop GPU. Gemini reviews every workspace step, simple or advanced. "
                  "Requires GEMINI_API_KEY in the server-only .env file and internet access. "
                  "The explicit /api/local routes retain the older exact checker and local recognition. "
-                 "Hints appear first. Set request_correction=true to request a supported correction. "
+                 "Hints are available only on request through /api/hint. Set request_correction=true to request a supported correction. "
                  "Set input_format=latex for the supported OCR-LaTeX subset. "
                  "Handwriting readings require confirmation before checking. "
                  "Drafts are stored only in the browser; no server-side saved sessions yet."),
@@ -108,8 +110,8 @@ def health() -> dict[str, str]:
 
 
 @app.get("/api/recognition-status")
-def recognition_status() -> dict[str, object]:
-    return gemini.configuration()
+async def recognition_status() -> dict[str, object]:
+    return await glm_recognition.configuration()
 
 
 @app.post("/api/recognize")
@@ -118,21 +120,31 @@ async def recognize_image(request: Request, purpose: Literal["question", "step"]
     if request.headers.get("content-type", "").split(";")[0] not in ("image/png", "image/jpeg", "image/webp"):
         return JSONResponse({"detail": "Use a PNG, JPEG, or WebP image."}, status_code=415)
     try:
-        return await gemini.recognize(await request.body(), purpose)
+        return await glm_recognition.recognize(await request.body(), purpose)
     except (RecognitionError, GeminiError) as error:
         return JSONResponse({"detail": str(error)}, status_code=error.status_code)
 
 
 @app.post("/api/check-step", response_model=CheckResult, response_model_exclude_none=True)
 async def check(request: CheckRequest):
-    """Check one transition; include all earlier lines in history to retain warnings.
+    """Review a transition and whether it completes the original question.
 
     history is ordered and excludes previous_step. Return metadata/fingerprint
     lets the workspace discard results for an edited step or context. There is
     no server-side session state or automatic revision invalidation in this unit.
+    is_final_answer is true only for a verified, consistent, warning-free final answer.
     """
     try:
         return await gemini.check(request)
+    except GeminiError as error:
+        return JSONResponse({"detail": str(error)}, status_code=error.status_code)
+
+
+@app.post("/api/hint", response_model=HintResult, response_model_exclude_none=True)
+async def hint(request: HintRequest):
+    """Progressive help only. Never changes a step's mathematical verdict."""
+    try:
+        return await gemini.hint(request)
     except GeminiError as error:
         return JSONResponse({"detail": str(error)}, status_code=error.status_code)
 

@@ -41,8 +41,10 @@ The checker accepts math text and restricted OCR-LaTeX. A separate image endpoin
 
 ## Implemented Workspace Boundary
 
-- frontend/src/App.tsx coordinates question upload/selection, reading confirmation, independent step cards, feedback, and continuation. The dark responsive workspace uses a sticky question sidebar at tablet/laptop widths, right-side check buttons, and inline feedback. Unconfirmed handwriting readings open for review; confirmed readings collapse to keep writing visible.
+- frontend/src/App.tsx coordinates question upload/selection, reading confirmation, independent step cards, feedback, and continuation. The latest minimal workspace has one centered column, a compact question header, charcoal cards, circular check buttons, and inline feedback. Correct-step explanations and Gemini attribution are in an optional Details disclosure; warnings remain visible. Unconfirmed handwriting readings open for review; confirmed readings collapse to keep writing visible.
+- TypedStep.tsx shows either an editable equation field or its rendered math, avoiding duplicate input/preview text. Selecting the displayed equation reopens editing; blur/Enter returns to the preview without making a check request.
 - DrawingPad.tsx and ink.ts retain logical stroke coordinates, use Pointer Events/perfect-freehand, erase whole strokes, support undo, and rasterize dark ink on a clean white image for recognition independently of the dark display theme.
+- DrawingToolbar.tsx supplies one sticky toolbar for the selected box, including input mode and finger drawing. DrawingPad receives the shared tool; state.ts keeps each box's undo history (50 actions, excluded from saved drafts). Accepted current correct intermediate last-step results append one blank box, preserving input mode, with no manual add button. A verified, consistent, warning-free is_final_answer flag marks completion instead and removes only untouched trailing empty boxes. Existing later writing/edits are retained. Completion belongs to the last written step, clears on relevant edits, and is not restored from old feedback.
 - Writing surfaces disable native panning to prevent pen-stroke cancellation. With finger drawing off, one-finger drags explicitly scroll the page; additional contacts during an active stroke are ignored. Native inertia/actual Pencil palm behavior is not claimed and needs on-device testing.
 - state.ts binds each response to a request token, step revision, and a snapshot of the question/variable/all preceding steps. Edits invalidate that step and later feedback. Full ordered history accompanies checks.
 - api.ts validates response shapes and keeps transport/recognition errors separate from mathematical verdicts.
@@ -208,3 +210,50 @@ An HTTP Safari page is sufficient for the earliest drawing/file-upload test. Ins
 ## References
 
 The existing [plan](MATH_BUDDY_PLAN.md) contains researched tool links and remains unchanged. Current user decisions in [project overview](<project-overview (2).md>) control product behavior where the earlier plan offered alternatives.
+
+
+## Progressive hint workspace (October 17, 2026)
+
+`HintPanel.tsx` replaces static guidance with first/stronger hints and explicit
+next-step requests. `hints.ts` builds confirmed context and manages per-target,
+per-revision in-tab caches. Selected cards or the Hint for selector determine the
+focus. Unread ink is transcribed/edited/confirmed without invoking a check.
+`POST /api/hint`, HintRequest/HintResult, and GeminiService.hint share the existing
+server-only Gemini client. Levels 1/2 never return the next_step field; level 3
+requires explicit consent and two prior hints. Earlier known errors suppress
+continuation suggestions. Hints never dispatch CheckResult or change a verdict.
+Edits invalidate relevant hints and abort/ignore old requests. Hints are not
+persisted in the existing device draft; closing/reopening the panel reuses them.
+
+## Automatic transcription (October 18, 2026)
+
+`autoRead.ts` owns the shared step-image request lane for automatic and manual
+reads. A new pen/eraser gesture invalidates feedback immediately; `endInk`
+starts a 2500ms idle delay, also reset by undo/clear changes. A held pointer is
+never read. One image read runs at a time per tab, while newer edits replace a
+queued snapshot. App/reducer revision checks discard outdated replies. Matching
+ink can reuse its last in-tab reading, including manual text corrections.
+Restored drafts, typed/empty boxes, and text-only edits do not start auto reads.
+Errors wait for an explicit retry or edited ink. The ephemeral drawing flag,
+queue, and reading cache are not persisted. Automatic reading invokes only
+recognition; confirmation, correctness review, completion, and hints still
+require the existing explicit actions.
+
+## Local 4-bit OCR and Gemini review (October 18, 2026)
+
+Default `/api/recognize` now uses GLMRecognitionService, not Gemini image calls.
+It owns a loopback llama.cpp worker with fixed Q4_K_M decoder and Q4_1 vision
+files, validates GGUF precision before loading, and uses Formula Recognition
+for steps/Text Recognition for questions. A bounded one-slot NVIDIA Vulkan
+worker is guarded by free-VRAM checks, image/context limits, a 3 GB Windows
+process job, owner-exit cleanup, and 60-second idle shutdown. The local endpoint
+uses a per-service ephemeral key. There is no automatic CPU/cloud OCR fallback.
+The original UniMERNet tools remain explicit legacy routes, never loaded by
+the normal interface. The existing frontend reading queue and confirmation
+flow are unchanged; cloud requests contain confirmed math, not image OCR.
+
+Math review/hints use gemini-3.5-flash-lite, selected by the user after Google
+rejected 2.5 Flash-Lite for this key. `.env` remains server-only. Configuration
+reports OCR readiness/precision separately from Gemini review readiness. The
+installer downloads prequantized files and a pinned runtime with SHA-256 checks,
+without loading/converting full-precision weights. See LOCAL_OCR_SETUP.md.

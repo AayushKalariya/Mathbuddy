@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import type { PointerEvent } from "react";
-import { Eraser, PenLine, RotateCcw, Undo2 } from "lucide-react";
 import {
   INK_HEIGHT,
   INK_WIDTH,
@@ -15,23 +14,28 @@ type Props = {
   strokes: Stroke[];
   touchDrawing: boolean;
   label: string;
+  tool: "pen" | "eraser";
+  onBegin: () => void;
+  onEnd: () => void;
   onChange: (strokes: Stroke[]) => void;
 };
 export default function DrawingPad({
   strokes,
   touchDrawing,
   label,
+  tool,
+  onBegin,
+  onEnd,
   onChange,
 }: Props) {
-  const [tool, setTool] = useState<"pen" | "eraser">("pen");
   const [draft, setDraft] = useState<Stroke | undefined>();
   const active = useRef<{
     id: number;
     points: Point[];
     before: Stroke[];
     remaining: Stroke[];
+    tool: "pen" | "eraser";
   } | null>(null);
-  const undo = useRef<Stroke[][]>([]);
   const finger = useRef<{ id: number; y: number } | null>(null);
   function point(
     event: PointerEvent<SVGSVGElement> | globalThis.PointerEvent,
@@ -80,9 +84,10 @@ export default function DrawingPad({
       points: [p],
       before: strokes,
       remaining: strokes,
+      tool,
     };
     // Invalidate feedback at pen-down, before an older request can resolve.
-    onChange(strokes);
+    onBegin();
     if (tool === "eraser") erase(p);
     else setDraft({ points: [p] });
   }
@@ -112,9 +117,10 @@ export default function DrawingPad({
     for (const sample of events.length ? events : [event.nativeEvent]) {
       const p = point(sample, rect);
       active.current.points.push(p);
-      if (tool === "eraser") erase(p);
+      if (active.current.tool === "eraser") erase(p);
     }
-    if (tool === "pen") setDraft({ points: [...active.current.points] });
+    if (active.current.tool === "pen")
+      setDraft({ points: [...active.current.points] });
   }
   function finish(event: PointerEvent<SVGSVGElement>) {
     if (finger.current?.id === event.pointerId) {
@@ -125,87 +131,26 @@ export default function DrawingPad({
     }
     if (active.current?.id !== event.pointerId) return;
     const writing = active.current;
-    undo.current.push(writing.before);
     onChange(
-      tool === "pen"
+      writing.tool === "pen"
         ? [...writing.before, { points: writing.points }]
         : writing.remaining,
     );
     active.current = null;
     setDraft(undefined);
+    onEnd();
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
   }
-  function clear() {
-    undo.current.push(strokes);
-    onChange([]);
-  }
   return (
     <div className="drawing-pad">
-      <div
-        className="ink-toolbar"
-        role="toolbar"
-        aria-label={`${label} drawing tools`}
-      >
-        <div className="tool-group">
-          <button
-            type="button"
-            className={tool === "pen" ? "tool active" : "tool"}
-            aria-pressed={tool === "pen"}
-            onClick={() => setTool("pen")}
-            title="Pen"
-          >
-            <PenLine size={17} />
-            <span>Pen</span>
-          </button>
-          <button
-            type="button"
-            className={tool === "eraser" ? "tool active" : "tool"}
-            aria-pressed={tool === "eraser"}
-            onClick={() => setTool("eraser")}
-            title="Erase a stroke"
-          >
-            <Eraser size={17} />
-            <span>Eraser</span>
-          </button>
-          <span className="tool-divider" />
-          <button
-            type="button"
-            className="tool"
-            aria-label={`Undo ${label}`}
-            title="Undo"
-            disabled={!undo.current.length}
-            onClick={() => {
-              const previous = undo.current.pop();
-              if (previous) onChange(previous);
-            }}
-          >
-            <Undo2 size={18} />
-          </button>
-          <button
-            type="button"
-            className="tool"
-            aria-label={`Clear ${label}`}
-            title="Clear writing"
-            disabled={!strokes.length}
-            onClick={clear}
-          >
-            <RotateCcw size={17} />
-          </button>
-        </div>
-        <span className="ink-tip">
-          {touchDrawing
-            ? "Pencil, finger, or mouse"
-            : "Pencil or mouse · scroll with a finger"}
-        </span>
-      </div>
       <div className="paper">
         {!strokes.length && !draft && (
-          <span className="paper-placeholder">Write your next step here…</span>
+          <span className="paper-placeholder">What comes next?</span>
         )}
         <svg
           viewBox={`0 0 ${INK_WIDTH} ${INK_HEIGHT}`}
-          preserveAspectRatio="none"
+          preserveAspectRatio="xMinYMin meet"
           role="img"
           aria-label={`${label} handwriting area`}
           // Native pan-y can cancel pen strokes too. Route finger drags explicitly.
