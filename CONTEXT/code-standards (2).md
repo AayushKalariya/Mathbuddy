@@ -66,14 +66,14 @@ The checker was implemented with Python 3.10.11 in .checker-venv. Its exact depe
 ## Styling and Writing Interaction
 
 - Optimize the solving workspace for iPad touch/pen use and Windows browser use.
-- Keep the question visible beside or above separate step areas, depending on screen width.
-- Provide clear pen, eraser, undo, Check step, correction-on-request, and next-step controls.
+- Keep the compact question header above the step areas in one centered column at every screen width.
+- Use one shared icon toolbar for pen, eraser, per-box undo/clear, keyboard entry, and optional finger drawing. Keep circular Check controls beside each box and corrections on request.
 - Show status with text/icons as well as color.
 - Preserve layout when feedback appears; do not cover active writing with an unsolicited dialog.
-- Allow continuing after a flagged issue with a visible warning.
+- Automatically append one box only after a current, correct intermediate last-step assessment with consistent context. A verified, warning-free final answer to the original task marks completion without another box. Determine completion in the existing Gemini review, preserve existing written/edited boxes, and clear completion after relevant edits.
 - Test actual pen, palm, scrolling, and rotation behavior.
 
-The workspace now follows the user-provided dark interface reference: a deep blue background (#162556), dark navy cards (#060c24), yellow side check buttons (#ffb900), and teal verified states (#00d5be). The palette was sampled from the user’s latest reference. The question sits beside the step boxes on iPad/laptop widths and above them on narrow screens. System fonts, Lucide icons, and local KaTeX assets remain in use. Pencil writing with finger scrolling is the default; finger drawing remains optional. Keep handwriting readings editable and require review before a mathematical verdict. No component library is used.
+The latest minimal reference supersedes the earlier blue/yellow palette and sidebar: near-black background (#09090b), charcoal cards (#18181b), quiet gray controls, and green correct states. Use one centered column, short step labels, a small checked count, and no motivational/helper paragraphs in the default solving view. Successful feedback stays to one line with an optional Details disclosure; warnings and errors remain visible. Typed math displays once and opens for editing on selection. System fonts, Lucide icons, and local KaTeX assets remain in use. Pencil writing with finger scrolling is the default; finger drawing remains optional. Keep handwriting readings editable and require review before a mathematical verdict. No component library is used.
 
 ## API
 
@@ -121,3 +121,12 @@ The backend test runner is unittest, with HTTPX ASGITransport for API tests and 
 ## File Organization
 
 The architecture file contains the proposed source layout. Name modules after their responsibilities and keep mathematical code out of UI components. Preserve the existing context filenames unless the user requests renaming.
+
+
+On-demand hints replace static guidance. Hinting must remain separate from grading: first a concept, then more specific guidance, then a suggested line only on explicit request. Confirm unread ink before step-specific help. Cache displayed hints per target and premise revision in the open tab; clear stale context and reject old replies. Keep the question/selected-step target explicit, and retain earlier-error warnings.
+
+Step checking must not automatically display hints or next-step guidance. Gemini
+review hints are suppressed server-side and ignored by the feedback view. Normal
+feedback shows the verdict and important warnings, with assessment explanations
+under Details. Tutoring guidance and corrected lines require an explicit Hint or
+correction request. Keep next-operation suggestions out of ordinary review messages.

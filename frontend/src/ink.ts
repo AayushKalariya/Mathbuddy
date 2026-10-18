@@ -2,7 +2,7 @@ import { getStroke } from "perfect-freehand";
 import type { Point, Stroke } from "./state";
 
 export const INK_WIDTH = 1000;
-export const INK_HEIGHT = 280;
+export const INK_HEIGHT = INK_WIDTH;
 export function inputIntent(
   pointerType: string,
   touchDrawing: boolean,

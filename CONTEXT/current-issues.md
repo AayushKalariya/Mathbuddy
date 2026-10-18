@@ -99,3 +99,170 @@ Test upload/write/check on the user's iPad using WORKSPACE_TESTING.md. Address m
 Continue the recognition benchmark separately. No paid fallback is selected.
 
 Manual and automated test instructions: [CHECKER_TESTING.md](../CHECKER_TESTING.md).
+
+
+## Progressive hints — October 17, 2026
+
+The static guidance button has been replaced by on-demand Gemini hints. Hints
+are cached in the current tab only; reloading does not restore hint progression.
+A live test initially encountered a transient provider-unavailable response;
+a later real request succeeded, and the live calculus flow completed concept,
+stronger hint, and explicitly requested suggested-line stages. API failure/retry
+and stale-response behavior are tested separately with simulated responses.
+General hint quality/answer-leak avoidance remains model-dependent and needs
+broader evaluation; structured output and instructions are not a proof of pedagogy.
+Actual iPad/Pencil behavior still requires a device check.
+
+## Shared toolbar and automatic boxes — October 17, 2026
+
+The latest user choice replaces manual next-box creation. One sticky toolbar
+controls the selected step's input mode, pen, eraser, undo, clear, and optional
+finger drawing. Undo histories are separate per box and remain in memory only.
+One blank box opens after the last box receives a current verified assessment
+with a valid transition and consistent context. Issues and failures do not add
+boxes; existing draft boxes remain available. The existing 34-box limit remains.
+
+Verified with 54 frontend tests, 114 backend tests, a production build, and
+browser checks at laptop, 768px tablet, and 390px phone widths. Simulated-provider
+UI tests covered error/issue/no-duplicate behavior, reading before checking,
+per-box eraser/undo/clear, selection, and draft recovery. A real Gemini review of
+3x=12 from 3x+8=20 succeeded and automatically opened Step 2. Preview:
+artifacts/seamless-workspace.jpg. Real Pencil/palm/rotation testing remains open.
+
+## Minimal workspace — October 17, 2026
+
+The latest reference replaces the blue/yellow sidebar layout with a near-black
+single-column workspace, compact question header, charcoal cards, and circular
+gray/green check buttons. Shared tools are icons with accessible labels/titles;
+Pen and the keyboard icon switch the selected step's input mode. Hints open
+inline from the small Hint action. Successful feedback is one line with review
+details on demand; warnings, errors, and stale work remain visible. Typed math
+now shows once and opens for editing when selected.
+
+Verified with 54 frontend tests, the production build, and an isolated simulated
+provider in the browser. Checks covered editing/rechecking, auto-added boxes,
+corrections, progressive hints, handwriting confirmation without grading,
+eraser/undo/clear, finger-drawing toggling, and saved draft recovery. Desktop,
+768px iPad portrait, and 390px phone layouts had no horizontal overflow. No new
+live Gemini accuracy or physical iPad/Pencil claims are made for this UI update.
+Preview: artifacts/minimal-workspace.jpg.
+
+## Final-answer completion — October 17, 2026
+
+The existing Gemini step review now includes a required boolean is_final_answer
+against the original task and full history. Completion is suppressed unless the
+result is verified, valid, consistent, and warning-free. Intermediate correct
+steps continue opening a box; final answers show Question complete instead.
+Only untouched trailing empty boxes are removed from older drafts. Later edits,
+writing, and undo history are retained. Editing premises invalidates completion;
+saved drafts keep content but require fresh checks, as before.
+
+Restart the running Python server, refresh, and recheck an existing final step.
+The frontend reports an actionable restart message for an older backend without
+the new field. No extra completion API request, automatic reading, or checking
+was introduced. The explicit local checker defaults completion to false.
+
+Verification: 117 backend tests, 70 frontend tests, production build, and isolated
+browser tests for typed/handwritten completion, intermediate continuation,
+wrong answers, final rechecks, edit/reopen, and unused-box cleanup. Four live
+Gemini checks correctly classified an intermediate algebra line, a final algebra
+answer, a complete chain-rule derivative, and an incomplete real root set.
+These are smoke tests, not a general mathematical accuracy guarantee. Preview:
+artifacts/question-complete.jpg. Actual Pencil/device checks remain open.
+
+## No unsolicited hints — October 17, 2026
+
+Removed automatic rendering of check-response hints. All assessment explanations
+are under Details; ordinary checks show verdicts and important warnings. Gemini
+review instructions now require hint=null and forbid next-operation guidance in
+messages/warnings, and the backend strips the hint field even if the model
+supplies one. The separate progressive Hint action and requested corrections remain.
+
+Verification: 118 backend tests, 70 frontend tests, and the production build pass.
+Two live Gemini checks (3x=15 and 3x=14 for 3x+1=16) returned no hints. Isolated
+browser tests deliberately injected legacy guidance in both hint/message fields:
+none was visible automatically after correct or incorrect checks; guidance appeared
+when Hint was clicked, and explicit corrections still worked. Preview:
+artifacts/hints-on-request.jpg. Refresh the app; restart the running Python server
+to load the updated review instructions and server-side hint suppression.
+
+## Automatic handwriting reading — October 18, 2026
+
+After the question is confirmed, new handwriting/eraser/undo changes are read
+after 2.5 seconds of idle time. Further writing resets the timer; pen-down holds
+block reading. Automatic, Check-button, Hint-panel, and Read again step-image
+reads share one lane per tab, combining pending edits and rejecting stale
+replies. Matching ink reuses its current in-tab reading, including text edits.
+Reading does not grade, mark completion, add boxes, or request hints. Failures
+remain visible with manual retry; no retry loop or draft-restore calls occur.
+Frequent pauses can still use quota; there is no additional throttle.
+
+Verification: 83 frontend tests and the production build passed. An isolated
+simulated-provider browser session verified automatic reading, serialized reads
+with edits during an 8-second request, preservation of text edits during a late
+reply, rate-limit/retry recovery, and explicit confirmation/checking. Metrics
+showed at most one active image request and zero reviews until the check button
+was pressed. No new live Gemini accuracy or physical iPad claims are made.
+Preview: artifacts/automatic-reading.jpg. Refresh the browser to load this
+frontend update; the user's running server and port-8000 draft were preserved.
+
+## Local GPU Q4 OCR and cheaper Gemini review — October 18, 2026
+
+The user requested GLM-OCR transcription on the laptop GPU, then explicitly
+required 4-bit operation after reporting computer instability. Ollama and its
+unfinished full-precision download were stopped. No full-precision model is
+used. The installed setup uses a dedicated pinned llama.cpp Vulkan worker on
+the NVIDIA RTX 4050 (6 GB): decoder Q4_K_M and vision Q4_1. GGUF precision is
+checked before launch; weights/runtime downloads are SHA-256 verified. No CPU
+or cloud OCR fallback, no extra local model, no large PyTorch installation.
+
+Bounded resources: 2048 context, one slot, 512 image-token cap, bounded raster,
+small batches, no large warm-up, 2.3 GB free-VRAM preflight, a 3 GB Windows RAM
+job limit, and 60-second idle unloading. The Windows job kills the worker when
+the app exits. An initial runtime warm-up tried a large vision workspace; the
+worker was stopped, image tokens were bounded, and subsequent tests succeeded.
+All 18 decoder layers and the CLIP encoder used Vulkan0, the NVIDIA GPU. Real
+OCR used approximately 1.7–1.9 GB total GPU memory including the desktop, with
+about 532 MB worker RAM in the final sample.
+
+Google rejected the requested gemini-2.5-flash-lite as unavailable to new users
+of this key. The user explicitly chose gemini-3.5-flash-lite. The server-only
+.env and default settings now select that model; the key was preserved. Live
+algebra and calculus reviews succeeded. All image routes used by the interface
+now go to local GLM-OCR; checks and hints remain Gemini and require confirmation.
+
+Verification: 127 backend and 83 frontend tests, production build, actual GPU
+inference, and the browser's 2.5-second automatic read -> edit -> explicit
+Gemini check -> next box flow passed. Printed 3x=15 was read; a block-drawn 3
+was misread as a Chinese character and corrected in the editable reading before
+checking. This is a smoke test, not a handwriting accuracy guarantee. Preview:
+artifacts/local-glm-q4.jpg. The existing port-8000 app was restarted with the
+new backend, retaining its 127.0.0.1 binding and browser draft. The isolated
+port-8002 test server/tab were closed. Setup/recovery: LOCAL_OCR_SETUP.md.
+
+## Incorrect positive on a double-integral step — October 18, 2026
+
+The screenshot displayed integral_0^2 integral_0^1 x^2 y^2 dx dy, followed by
+x^2 y^3/3 evaluated from 0 to 1. The user confirmed Details claimed the inner
+integration in x was correct with y constant, despite the changed y exponent.
+The check route had trusted a single structured Gemini verdict without an
+independent calculus comparison. Two fresh live reviews rejected the wrong
+step and accepted x^3 y^2/3 at those limits, so the original raw response could
+not be reproduced; the existing positive-review trust path was confirmed.
+
+Added explicit integration-variable/bound instructions and a bounded negative-only
+polynomial evaluation safeguard. Every request still calls Gemini once. A
+contradictory positive on a supported first evaluation of a constant-bounds
+rectangular double integral is overridden to issue/invalid, final=false, and no
+correction/hint. Exact endpoint/full-integral comparisons allow supported
+reordering, rescaled bounds, and equivalent forms. No unrestricted string
+parser, eval, general symbolic integration, additional AI call, or GPU is used.
+Unsupported notation and later steps remain with Gemini; general mathematical
+accuracy is not guaranteed.
+
+Verification: 136 backend and 83 frontend tests pass. An isolated browser test
+intentionally supplied the same false AI-positive explanation: the screenshot's
+wrong step was rejected, no extra box appeared, and the corrected x-integration
+then passed and opened the next box. Console was clean. Preview:
+artifacts/integral-false-positive-guard.jpg. The user's running backend/draft
+were left intact; restart that backend, refresh, and recheck to load this fix.

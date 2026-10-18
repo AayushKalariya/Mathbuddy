@@ -1,8 +1,12 @@
 # Math Buddy
 
+**Current model setup:** local 4-bit GLM-OCR on the laptop GPU reads images;
+Gemini 3.5 Flash-Lite reviews confirmed math and supplies requested hints.
+See [LOCAL_OCR_SETUP.md](LOCAL_OCR_SETUP.md) for installation and memory limits.
+
 A personal math-step assistant hosted on your laptop. Upload a question, write in separate step
 areas, review recognized math, and check each step. The React/TypeScript workspace
-uses a Python backend and Gemini to read and review every submitted step, simple
+uses a Python backend, local GLM-OCR, and Gemini to review every submitted step, simple
 or advanced. The original offline checker and recognition environment are preserved.
 
 **First:** add your key to the local `.env` file; see [GEMINI_SETUP.md](GEMINI_SETUP.md).
@@ -44,23 +48,28 @@ Installation/recovery commands and examples are in the testing guide.
 
 ## Current scope
 
-- Gemini image reading and review of all workspace steps, including advanced math.
+- Local 4-bit GLM-OCR image reading and Gemini review of all workspace steps, including advanced math.
 - Short feedback, clarification states, and explicit Gemini attribution.
 - Preserved offline exact arithmetic and affine expression rewrites.
 - One-variable linear equations over the real numbers, including alternative paths.
-- Short hints, opt-in supported corrections, and warnings about earlier mistakes.
+- On-demand progressive hints for the question or selected step, with an explicit next-step reveal.
+- Short check feedback, opt-in supported corrections, and warnings about earlier mistakes.
 - CLI, stateless API, bounded input, and automated tests.
 - Explicit legacy local recognition at `/api/local/recognize`, with its separate .venv.
-- Upload and question selection, editable readings, separate drawing areas,
-  pen/whole-stroke eraser/undo, typed fallback, manual checking, and optional corrections.
-- Apple Pencil/mouse input by default, optional finger drawing, responsive layout.
+- Upload and question selection, automatic handwriting reading after a 1.5-second
+  pause, editable readings, separate drawing areas,
+  a shared pen/whole-stroke eraser/undo toolbar, typed fallback, manual checking,
+  automatic next boxes after correct intermediate steps, final-answer completion
+  in the same Gemini review, and optional corrections.
+- Apple Pencil/mouse input by default, optional finger drawing, and a minimal
+  dark workspace with one column, a compact icon toolbar, and short feedback.
 - One browser/device draft with stale-result invalidation and complete supplied history.
 - A restricted LaTeX adapter including observed recognition formatting.
 
 Laptop session storage/sync, installable Home Screen mode/HTTPS, automatic
 checking, independent symbolic calculus verification, and an AI chat sidebar are future work.
-Actual iPad/Pencil behavior still needs a device test. Workspace readings and checks
-are sent to Gemini; AI reviews are not guaranteed mathematical proofs. The CLI and
+Actual iPad/Pencil behavior still needs a device test. Confirmed mathematical context and checks
+are sent to Gemini; images are transcribed locally, and AI reviews are not guaranteed mathematical proofs. The CLI and
 explicit `/api/local/` endpoints still operate offline. Drafts are specific to the browser,
 device, and URL; they are not synced to the laptop or other devices.
 

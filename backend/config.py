@@ -8,7 +8,12 @@ import re
 from dotenv import dotenv_values
 
 ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "gemini-3.5-flash-lite"
+
+
+def ocr_model() -> str:
+    # Fixed precision: configuration cannot select a higher-precision model.
+    return "glm-ocr-q4"
 
 
 @dataclass(frozen=True)
